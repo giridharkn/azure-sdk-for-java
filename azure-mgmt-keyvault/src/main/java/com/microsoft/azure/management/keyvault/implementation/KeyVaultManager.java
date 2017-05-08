@@ -9,6 +9,8 @@ package com.microsoft.azure.management.keyvault.implementation;
 import com.microsoft.azure.AzureEnvironment;
 import com.microsoft.azure.AzureResponseBuilder;
 import com.microsoft.azure.credentials.AzureTokenCredentials;
+import com.microsoft.azure.keyvault.KeyVaultClient;
+import com.microsoft.azure.keyvault.authentication.KeyVaultCredentials;
 import com.microsoft.azure.management.graphrbac.implementation.GraphRbacManager;
 import com.microsoft.azure.management.keyvault.Vaults;
 import com.microsoft.azure.management.resources.fluentcore.arm.AzureConfigurable;
@@ -18,12 +20,15 @@ import com.microsoft.azure.management.resources.fluentcore.utils.ProviderRegistr
 import com.microsoft.azure.serializer.AzureJacksonAdapter;
 import com.microsoft.rest.RestClient;
 
+import java.io.IOException;
+
 /**
  * Entry point to Azure storage resource management.
  */
 public final class KeyVaultManager extends Manager<KeyVaultManager, KeyVaultManagementClientImpl> {
     // Service managers
     private GraphRbacManager graphRbacManager;
+    private final KeyVaultClient keyVaultClient;
     // Collections
     private Vaults vaults;
     // Variables
@@ -106,6 +111,23 @@ public final class KeyVaultManager extends Manager<KeyVaultManager, KeyVaultMana
                 .withBaseUrl(graphEndpoint)
                 .build(), tenantId);
         this.tenantId = tenantId;
+        KeyVaultCredentials keyVaultCredentials = new KeyVaultCredentials() {
+            @Override
+            public String doAuthenticate(String authorization, String resource, String scope) {
+                try {
+                    return ((AzureTokenCredentials) restClient.credentials()).getToken(resource);
+                } catch (IOException e) {
+                    return null;
+                }
+            }
+        };
+        keyVaultClient = new KeyVaultClient(restClient.newBuilder()
+                .withBaseUrl("https://{vaultBaseUrl}")
+                .withCredentials(keyVaultCredentials).build());
+    }
+
+    KeyVaultClient keyVaultClient() {
+        return keyVaultClient;
     }
 
     /**
